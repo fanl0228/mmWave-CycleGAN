@@ -1,12 +1,29 @@
+#!/usr/bin/python3
 import random
 import time
 import datetime
 import sys
+import logging
+import os
+
 
 from torch.autograd import Variable
 import torch
 from visdom import Visdom
 import numpy as np
+
+
+logger = logging.getLogger(__name__)
+logging.basicConfig(format="[ %(levelname)s ] %(message)s", level=logging.INFO)
+
+def create_folder(folder):
+    try:
+        os.makedirs(folder)
+        logger.info(f"Create `{os.path.join(os.getcwd(), folder)}` directory successful.")
+    except OSError:
+        logger.warning(f"Directory `{os.path.join(os.getcwd(), folder)}` already exists!")
+        pass
+
 
 def tensor2image(tensor):
     image = 127.5*(tensor[0].cpu().float().numpy() + 1.0)
@@ -36,9 +53,9 @@ class Logger():
 
         for i, loss_name in enumerate(losses.keys()):
             if loss_name not in self.losses:
-                self.losses[loss_name] = losses[loss_name].data[0]
+                self.losses[loss_name] = losses[loss_name]#.data[0]
             else:
-                self.losses[loss_name] += losses[loss_name].data[0]
+                self.losses[loss_name] += losses[loss_name]#.data[0]
 
             if (i+1) == len(losses.keys()):
                 sys.stdout.write('%s: %.4f -- ' % (loss_name, self.losses[loss_name]/self.batch))
@@ -61,10 +78,10 @@ class Logger():
             # Plot losses
             for loss_name, loss in self.losses.items():
                 if loss_name not in self.loss_windows:
-                    self.loss_windows[loss_name] = self.viz.line(X=np.array([self.epoch]), Y=np.array([loss/self.batch]), 
-                                                                    opts={'xlabel': 'epochs', 'ylabel': loss_name, 'title': loss_name})
+                    self.loss_windows[loss_name] = self.viz.line(X=np.array([self.epoch]), Y=np.array([loss.detach().cpu().numpy()/self.batch]), 
+                                                                opts={'xlabel': 'epochs', 'ylabel': loss_name, 'title': loss_name})
                 else:
-                    self.viz.line(X=np.array([self.epoch]), Y=np.array([loss/self.batch]), win=self.loss_windows[loss_name], update='append')
+                    self.viz.line(X=np.array([self.epoch]), Y=np.array([loss.detach().cpu().numpy()/self.batch]), win=self.loss_windows[loss_name], update='append')
                 # Reset losses for next epoch
                 self.losses[loss_name] = 0.0
 
