@@ -26,3 +26,10 @@ class ImageDataset(Dataset):
 
     def __len__(self):
         return max(len(self.files_A), len(self.files_B))
+
+
+def get_batch_spectrum(image_path, transforms_=None):
+    transform = transforms.Compose(transforms_)
+    img = Image.open(image_path)
+    img = transform(img)
+    return img
