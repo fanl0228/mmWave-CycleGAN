@@ -2,9 +2,7 @@
 
 import argparse
 import logging
-import sys
 import os
-from tkinter import Variable
 
 import torch
 import torchvision.transforms as transforms
@@ -15,6 +13,8 @@ from models import Generator
 from datasets import get_batch_spectrum
 
 import matplotlib.pyplot as plt
+
+os.environ['KMP_DUPLICATE_LIB_OK']='True'
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format="[ %(levelname)s ] %(message)s", level=logging.INFO)
@@ -32,7 +32,7 @@ def main(args):
         netG_A2B.cuda(args.gpu)
     
     # load state dicts
-    netG_A2B.load_state_dict(torch.load(args.generator_A2B))
+    netG_A2B.load_state_dict(torch.load(args.generator_A2B, map_location=torch.device('cpu')))
 
     # eval
     netG_A2B.eval()
@@ -45,9 +45,6 @@ def main(args):
                     transforms.Normalize((0.5,), (0.5,)) ]
     imageA = get_batch_spectrum(image_path=args.image_path, transforms_=transforms_)
     imageA = torch.unsqueeze(imageA, dim=0)
-    
-    # import pdb
-    # pdb.set_trace()
 
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     imageA = imageA.to(device)
@@ -60,28 +57,27 @@ def main(args):
     logger.info("save path: " + outpath)
 
     if 1:
-        plt.figure()
+        plt.figure(1)
         plt.subplot(121)
-        plt.imshow(imageA)
+        plt.imshow(imageA[0][0], cmap='jet', aspect='auto')
         plt.title("imageA")
 
         plt.subplot(122)
-        plt.imshow(imageB)
+        plt.imshow(imageB[0][0], cmap='jet', aspect='auto')
         plt.title("imageB")
 
-        plt.show()
+        plt.pause(0.05)
 
-
+    print("done")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--image_path', type=str, default='/root/workspace/dataset/SpectrumV1.0/images/val/spectrum_9_s1_p0.png', help='root directory of the dataset')
-    parser.add_argument('--batchSize', type=int, default=16, help='size of the batches')
+    parser.add_argument('--image_path', type=str, default='./images/spectrum_23_s2_p7_up.png', help='root directory of the dataset')
     parser.add_argument('--input_nc', type=int, default=1, help='number of channels of input data')
     parser.add_argument('--output_nc', type=int, default=1, help='number of channels of output data')
     parser.add_argument('--size', type=int, default=128, help='size of the data (squared assumed)')
-    parser.add_argument('--gpu', type=int, default=0, help='use GPU computation')
+    parser.add_argument('--gpu', type=int, default=None, help='use GPU computation')
     parser.add_argument('--generator_A2B', type=str, default='weights/netG_A2B_last.pth', help='A2B generator checkpoint file')
     args = parser.parse_args()
     print(args)
