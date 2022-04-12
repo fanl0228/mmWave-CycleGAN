@@ -1,53 +1,66 @@
-# Pytorch-CycleGAN
-A clean and readable Pytorch implementation of CycleGAN (https://arxiv.org/abs/1703.10593)
+# mmCycle-CGAN
+
 
 ## Prerequisites
 Code is intended to work with ```Python 3.7.x```, it hasn't been tested with previous versions
 
-### [PyTorch & torchvision](http://pytorch.org/)
-Follow the instructions in [pytorch.org](http://pytorch.org) for your current setup
 
-### [Visdom](https://github.com/facebookresearch/visdom)
+### Visualize the training process
+[Visdom](https://github.com/facebookresearch/visdom)
 To plot loss graphs and draw images in a nice web browser view
-```
+
+```python
 pip3 install visdom
 ```
 
+```python
+python -m visdom.server
+```
+
+You can also view the training progress as well as live output images by running ```python3 -m visdom``` in another terminal and opening [http://localhost:8097/](http://localhost:8097/) in your favourite web browser.
+
+
+If it is a remote server, a local ssh login is required to establish a connection
+```
+ssh -L 18097:127.0.0.1:8097 user@ip
+```
+> Open the link [http://localhost:18097/](http://localhost:18097/) in your local browser
+
+
+
 ## Training
-### 1. Setup the dataset
-First, you will need to download and setup a dataset. The easiest way is to use one of the already existing datasets on UC Berkeley's repository:
-```
-./download_dataset <dataset_name>
-```
-Alternatively you can build your own dataset by setting up the following directory structure:
+### 1. Prepare the dataset
 
-    .
-    ├── datasets                   
-    |   ├── <dataset_name>
-    |   |   ├── train              # Training
-    |   |   |   ├── A              # Contains domain A images (i.e. mmSpectrum)
-    |   |   |   └── B              # Contains domain B images (i.e. audio Spectrum)
-    |   |   └── test               # Testing
-    |   |   |   ├── A              # Contains domain A images
-    |   |   |   └── B              # Contains domain B images
+- directory structure:
+>
+    .  
+
+    ├── <dataset_name>
+    |   ├── train              # Training
+    |   |   ├── mmwave              # Contains domain mmSpectrum images
+    |   |   └── audio              # Contains domain audio Spectrum images
+    |   └── test               # Testing
+    |   |   ├── mmwave              # Contains domain mmSpectrum images
+    |   |   └── audio              # Contains domain audio Spectrum images
     
-### 2. Train!
+### 2. Train
 ```
-python train.py --dataroot datasets/<dataset_name>/ --gpu 0
+python train.py --dataroot ${datasets_path} 
 ```
-This command will start a training session using the images under the *dataroot/train* directory with the hyperparameters that showed best results according to CycleGAN authors. You are free to change those hyperparameters, see ```./train --help``` for a description of those.
+We use gpu0 for training by default
 
-Both generators and discriminators weights will be saved under the output directory.
 
-If you don't own a GPU remove the --gpu option, although I advise you to get one!
+### 3. Model save path
 
-You can also view the training progress as well as live output images by running ```python3 -m visdom``` in another terminal and opening [http://localhost:8097/](http://localhost:8097/) in your favourite web browser. This should generate training loss progress as shown below (default params, horse2zebra dataset):
+Both generators and discriminators weights will be saved under the ```weights``` directory.
 
-### 3. Train with Pretrain
+
+### 4. Train with Pretrain
 
 ```
 python train.py --netD_A "weights/netD_A_last.pth" --netD_B "weights/netD_B_last.pth" --netG_A2B "weights/netG_A2B_last.pth" --netG_B2A "weights/netG_B2A_last.pth"
 ```
+
 
 ## Testing
 ```

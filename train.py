@@ -1,9 +1,11 @@
 #!/usr/bin/python3
 
 import argparse
+from asyncio import FastChildWatcher
 import itertools
 
 import torchvision.transforms as transforms
+from torchvision.transforms import InterpolationMode
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 from PIL import Image
@@ -17,7 +19,7 @@ from utils import Logger
 from utils import weights_init_normal
 from datasets import ImageDataset
 
-
+import pdb
 
 def main(args):
 
@@ -61,6 +63,7 @@ def main(args):
     # Optimizers & LR schedulers
     optimizer_G = torch.optim.Adam(itertools.chain(netG_A2B.parameters(), netG_B2A.parameters()),
                                     lr=args.lr, betas=(0.5, 0.999))
+    # optimizer_G = torch.optim.Adam(netG_A2B.parameters(), lr=args.lr, betas=(0.5, 0.999))
     optimizer_D_A = torch.optim.Adam(netD_A.parameters(), lr=args.lr, betas=(0.5, 0.999))
     optimizer_D_B = torch.optim.Adam(netD_B.parameters(), lr=args.lr, betas=(0.5, 0.999))
 
@@ -72,20 +75,20 @@ def main(args):
     Tensor = torch.cuda.FloatTensor if args.gpu is not None else torch.Tensor
     input_A = Tensor(args.batchSize, args.input_nc, args.size, args.size)
     input_B = Tensor(args.batchSize, args.output_nc, args.size, args.size)
-    target_real = Variable(Tensor(args.batchSize).fill_(1.0), requires_grad=False)
-    target_fake = Variable(Tensor(args.batchSize).fill_(0.0), requires_grad=False)
+    target_real = Variable(Tensor(args.batchSize, 1).fill_(1.0), requires_grad=False)
+    target_fake = Variable(Tensor(args.batchSize, 1).fill_(0.0), requires_grad=False)
 
     fake_A_buffer = ReplayBuffer()
     fake_B_buffer = ReplayBuffer()
-
+    
     # Dataset loader
-    transforms_ = [ transforms.Resize(int(args.size*1.12), Image.BICUBIC), 
-                    transforms.RandomCrop(args.size), 
-                    transforms.RandomHorizontalFlip(),
+    transforms_ = [ transforms.Resize([args.size, args.size],interpolation=InterpolationMode.BICUBIC), # Image.BICUBIC
+                    # transforms.RandomCrop(args.size), 
+                    # transforms.RandomHorizontalFlip(),
                     transforms.ToTensor(),
                     transforms.Normalize((0.5,), (0.5,)) ]
-    dataloader = DataLoader(ImageDataset(args.dataroot, transforms_=transforms_, unaligned=True), 
-                            batch_size=args.batchSize, shuffle=True, num_workers=args.n_cpu, drop_last=True)
+    dataloader = DataLoader(ImageDataset(args.dataroot, transforms_=transforms_, mode='train'), 
+                            batch_size=args.batchSize, shuffle=False, num_workers=args.n_cpu, drop_last=True)
 
     # Loss plot
     logger = Logger(args.n_epochs, len(dataloader))
@@ -95,8 +98,8 @@ def main(args):
     for epoch in range(args.epoch, args.n_epochs):
         for i, batch in enumerate(dataloader):
             # Set model input
-            real_A = Variable(input_A.copy_(batch['A']))
-            real_B = Variable(input_B.copy_(batch['B']))
+            real_A = Variable(input_A.copy_(batch['mmwave']))
+            real_B = Variable(input_B.copy_(batch['audio']))
 
             ###### Generators A2B and B2A ######
             optimizer_G.zero_grad()
@@ -117,7 +120,8 @@ def main(args):
             fake_A = netG_B2A(real_B)
             pred_fake = netD_A(fake_A)
             loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
-
+            
+            # pdb.set_trace()
             # Cycle loss
             recovered_A = netG_B2A(fake_B)
             loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*10.0
@@ -174,12 +178,15 @@ def main(args):
             logger.log({'loss_G': loss_G, 'loss_G_identity': (loss_identity_A + loss_identity_B), 'loss_G_GAN': (loss_GAN_A2B + loss_GAN_B2A),
                         'loss_G_cycle': (loss_cycle_ABA + loss_cycle_BAB), 'loss_D': (loss_D_A + loss_D_B)}, 
                         images={'real_A': real_A, 'real_B': real_B, 'fake_A': fake_A, 'fake_B': fake_B})
+            
+            # logger.log({'loss_G': loss_G, 'loss_G_identity': loss_identity_B, 'loss_G_GAN': loss_GAN_A2B,
+            #             'loss_D': loss_D_B}, images={'real_A': real_A, 'real_B': real_B, 'fake_B': fake_B})
         
-        if epoch % 10 == 0:
+        if epoch % 50 == 0:
             # Save models checkpoints
             torch.save(netG_A2B.state_dict(), 'weights/epoch/netG_A2B_epoch{}.pth'.format(epoch))
-            torch.save(netG_B2A.state_dict(), 'weights/epoch/netG_B2A_epoch{}.pth'.format(epoch))
-            torch.save(netD_A.state_dict(), 'weights/epoch/netD_A_epoch{}.pth'.format(epoch))
+            # torch.save(netG_B2A.state_dict(), 'weights/epoch/netG_B2A_epoch{}.pth'.format(epoch))
+            # torch.save(netD_A.state_dict(), 'weights/epoch/netD_A_epoch{}.pth'.format(epoch))
             torch.save(netD_B.state_dict(), 'weights/epoch/netD_B_epoch{}.pth'.format(epoch))
 
         # Update learning rates
@@ -189,28 +196,28 @@ def main(args):
 
         # Save models checkpoints
         torch.save(netG_A2B.state_dict(), 'weights/netG_A2B_last.pth')
-        torch.save(netG_B2A.state_dict(), 'weights/netG_B2A_last.pth')
-        torch.save(netD_A.state_dict(), 'weights/netD_A_last.pth')
+        # torch.save(netG_B2A.state_dict(), 'weights/netG_B2A_last.pth')
+        # torch.save(netD_A.state_dict(), 'weights/netD_A_last.pth')
         torch.save(netD_B.state_dict(), 'weights/netD_B_last.pth')
     ###################################
 
 if __name__== "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epoch', type=int, default=0, help='starting epoch')
-    parser.add_argument('--n_epochs', type=int, default=500, help='number of epochs of training')
-    parser.add_argument('--batchSize', type=int, default=16, help='size of the batches')
-    parser.add_argument('--dataroot', type=str, default='datasets/spectrum/', help='root directory of the dataset')
-    parser.add_argument("--netD_A", default="", type=str, help="Path to Discriminator checkpoint.")
-    parser.add_argument("--netD_B", default="", type=str, help="Path to Discriminator checkpoint.")
-    parser.add_argument("--netG_A2B", default="", type=str, help="Path to Generator checkpoint.")
-    parser.add_argument("--netG_B2A", default="", type=str, help="Path to Generator checkpoint.")
-    parser.add_argument('--lr', type=float, default=0.0002, help='initial learning rate')
-    parser.add_argument('--decay_epoch', type=int, default=300, help='epoch to start linearly decaying the learning rate to 0')
-    parser.add_argument('--size', type=int, default=128, help='size of the data crop (squared assumed)')
-    parser.add_argument('--input_nc', type=int, default=1, help='number of channels of input data')
-    parser.add_argument('--output_nc', type=int, default=1, help='number of channels of output data')
-    parser.add_argument("--gpu", type=int, default=0,  help="GPU id to use.")
-    parser.add_argument('--n_cpu', type=int, default=8, help='number of cpu threads to use during batch generation')
+    parser.add_argument('--epoch',       type=int,  default=0,      help='starting epoch')
+    parser.add_argument('--n_epochs',    type=int,  default=1000,    help='number of epochs of training')
+    parser.add_argument('--batchSize',   type=int,  default=32,     help='size of the batches')
+    parser.add_argument('--dataroot',    type=str,  default='/root/workspace/dataset/mmGAN_Dataset_Digital/', help='root directory of the dataset')
+    parser.add_argument("--netD_A",      type=str,  default="",     help="Path to Discriminator checkpoint.")
+    parser.add_argument("--netD_B",      type=str,  default="",     help="Path to Discriminator checkpoint.")
+    parser.add_argument("--netG_A2B",    type=str,  default="",     help="Path to Generator checkpoint.")
+    parser.add_argument("--netG_B2A",    type=str,  default="",     help="Path to Generator checkpoint.")
+    parser.add_argument('--lr',          type=float, default=0.0002, help='initial learning rate')
+    parser.add_argument('--decay_epoch', type=int,  default=300,    help='epoch to start linearly decaying the learning rate to 0')
+    parser.add_argument('--size',        type=int,  default=128,    help='size of the data crop (squared assumed)')
+    parser.add_argument('--input_nc',    type=int,  default=1,      help='number of channels of input data')
+    parser.add_argument('--output_nc',   type=int,  default=1,      help='number of channels of output data')
+    parser.add_argument("--gpu",         type=int,  default=0,      help="GPU id to use.")
+    parser.add_argument('--n_cpu',       type=int,  default=16,      help='number of cpu threads to use during batch generation')
     args = parser.parse_args()
     print(args)
 
