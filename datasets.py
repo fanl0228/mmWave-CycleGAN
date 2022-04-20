@@ -11,6 +11,12 @@ from torchvision.transforms import InterpolationMode
 import pdb
 
 
+def get_batch_spectrum(image_path, transforms_=None):
+    transform = transforms.Compose(transforms_)
+    img = Image.open(image_path)
+    img = transform(img)
+    return img
+
 class ImageDataset(Dataset):
     def __init__(self, root, transforms_=None, mode='train'):
         self.transform = transforms.Compose(transforms_)

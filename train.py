@@ -59,6 +59,7 @@ def main(args):
     criterion_GAN = torch.nn.MSELoss()
     criterion_cycle = torch.nn.L1Loss()
     criterion_identity = torch.nn.L1Loss()
+    criterion_similiraty = torch.nn.L1Loss()
 
     # Optimizers & LR schedulers
     optimizer_G = torch.optim.Adam(itertools.chain(netG_A2B.parameters(), netG_B2A.parameters()),
@@ -116,12 +117,13 @@ def main(args):
             fake_B = netG_A2B(real_A)
             pred_fake = netD_B(fake_B)
             loss_GAN_A2B = criterion_GAN(pred_fake, target_real)
+            loss_A2B_similarity = criterion_similiraty(fake_B, real_B)*5.0
 
             fake_A = netG_B2A(real_B)
             pred_fake = netD_A(fake_A)
             loss_GAN_B2A = criterion_GAN(pred_fake, target_real)
+            loss_B2A_similarity = criterion_similiraty(fake_A, real_A)*5.0 
             
-            # pdb.set_trace()
             # Cycle loss
             recovered_A = netG_B2A(fake_B)
             loss_cycle_ABA = criterion_cycle(recovered_A, real_A)*10.0
@@ -130,7 +132,7 @@ def main(args):
             loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*10.0
 
             # Total loss
-            loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB
+            loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB + loss_A2B_similarity + loss_B2A_similarity
             loss_G.backward()
             
             optimizer_G.step()
@@ -175,19 +177,20 @@ def main(args):
             ###################################
 
             # Progress report (http://localhost:8097)
-            logger.log({'loss_G': loss_G, 'loss_G_identity': (loss_identity_A + loss_identity_B), 'loss_G_GAN': (loss_GAN_A2B + loss_GAN_B2A),
-                        'loss_G_cycle': (loss_cycle_ABA + loss_cycle_BAB), 'loss_D': (loss_D_A + loss_D_B)}, 
+            logger.log({'loss_G': loss_G, 
+                        'loss_G_identity': (loss_identity_A + loss_identity_B), 
+                        'loss_G_GAN': (loss_GAN_A2B + loss_GAN_B2A),
+                        'loss_G_cycle': (loss_cycle_ABA + loss_cycle_BAB), 
+                        'loss_G_similarity': (loss_A2B_similarity + loss_B2A_similarity),
+                        'loss_D': (loss_D_A + loss_D_B)}, 
                         images={'real_A': real_A, 'real_B': real_B, 'fake_A': fake_A, 'fake_B': fake_B})
             
-            # logger.log({'loss_G': loss_G, 'loss_G_identity': loss_identity_B, 'loss_G_GAN': loss_GAN_A2B,
-            #             'loss_D': loss_D_B}, images={'real_A': real_A, 'real_B': real_B, 'fake_B': fake_B})
-        
-        if epoch % 50 == 0:
-            # Save models checkpoints
-            torch.save(netG_A2B.state_dict(), 'weights/epoch/netG_A2B_epoch{}.pth'.format(epoch))
-            # torch.save(netG_B2A.state_dict(), 'weights/epoch/netG_B2A_epoch{}.pth'.format(epoch))
-            # torch.save(netD_A.state_dict(), 'weights/epoch/netD_A_epoch{}.pth'.format(epoch))
-            torch.save(netD_B.state_dict(), 'weights/epoch/netD_B_epoch{}.pth'.format(epoch))
+        # if epoch % 100 == 0:
+        #     # Save models checkpoints
+        #     torch.save(netG_A2B.state_dict(), 'weights/netG_A2B_epoch{}.pth'.format(epoch))
+        #     torch.save(netG_B2A.state_dict(), 'weights/epoch/netG_B2A_epoch{}.pth'.format(epoch))
+        #     torch.save(netD_A.state_dict(), 'weights/epoch/netD_A_epoch{}.pth'.format(epoch))
+        #     torch.save(netD_B.state_dict(), 'weights/netD_B_epoch{}.pth'.format(epoch))
 
         # Update learning rates
         lr_scheduler_G.step()
@@ -196,8 +199,8 @@ def main(args):
 
         # Save models checkpoints
         torch.save(netG_A2B.state_dict(), 'weights/netG_A2B_last.pth')
-        # torch.save(netG_B2A.state_dict(), 'weights/netG_B2A_last.pth')
-        # torch.save(netD_A.state_dict(), 'weights/netD_A_last.pth')
+        torch.save(netG_B2A.state_dict(), 'weights/netG_B2A_last.pth')
+        torch.save(netD_A.state_dict(), 'weights/netD_A_last.pth')
         torch.save(netD_B.state_dict(), 'weights/netD_B_last.pth')
     ###################################
 
