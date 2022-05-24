@@ -108,6 +108,12 @@ output/B/
 # model checkpoints
 *.pth
 
-weights/epoch
+weights
+weights_0413_AP0.59
+weights_0414_AP0.4
+weights_0419_0.8
 
 weights_cycle/
+
+
+output/
