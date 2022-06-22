@@ -45,7 +45,6 @@ class ImageDataset(Dataset):
         return max(len(self.files_mmwave), len(self.files_audio))
 
 
-
 if __name__ == "__main__":
     import torchvision.transforms as transforms
     from torch.utils.data import DataLoader
@@ -62,5 +61,4 @@ if __name__ == "__main__":
         print(i)
         save_image(batch['mmwave'], "./batchA.png")
         save_image(batch['audio'], "./batchB.png")
-
 
