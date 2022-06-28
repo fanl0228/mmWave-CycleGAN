@@ -1,10 +1,12 @@
 '''
 Author: fanlong
-Date: 2022-04-24 19:54:56
+Date: 2022-06-28 14:25:32
 LastEditors: fanlong
-LastEditTime: 2022-04-24 19:56:08
-FilePath: /workspace/code/mmGAN/train_m2.py
+LastEditTime: 2022-06-28 16:40:31
+FilePath: /workspace/code/mmGAN/train_npyRx0.py
 Description: 
+
+2022-06-28: 训练mmGAN_0627数据集, 双通道时频数组的GAM增强（NPY <---> NPY）
 
 github: https://github.com/fanl0228
 Email: fanl@smail.nju.edu.cn
@@ -29,7 +31,8 @@ from utils import ReplayBuffer
 from utils import LambdaLR
 from utils import Logger
 from utils import weights_init_normal
-from datasets import ImageDataset
+from datasets import Rx0_ComplexNumpyDataset
+import numpy as np
 
 import pdb
 
@@ -76,6 +79,7 @@ def main(args):
     # Optimizers & LR schedulers
     optimizer_G = torch.optim.Adam(itertools.chain(netG_A2B.parameters(), netG_B2A.parameters()),
                                     lr=args.lr, betas=(0.5, 0.999))
+    # optimizer_G = torch.optim.Adam(netG_A2B.parameters(), lr=args.lr, betas=(0.5, 0.999))
     optimizer_D_A = torch.optim.Adam(netD_A.parameters(), lr=args.lr, betas=(0.5, 0.999))
     optimizer_D_B = torch.optim.Adam(netD_B.parameters(), lr=args.lr, betas=(0.5, 0.999))
 
@@ -85,8 +89,6 @@ def main(args):
 
     # Inputs & targets memory allocation
     Tensor = torch.cuda.FloatTensor if args.gpu is not None else torch.Tensor
-    input_A = Tensor(args.batchSize, args.input_nc, args.size, args.size)
-    input_B = Tensor(args.batchSize, args.output_nc, args.size, args.size)
     target_real = Variable(Tensor(args.batchSize, 1).fill_(1.0), requires_grad=False)
     target_fake = Variable(Tensor(args.batchSize, 1).fill_(0.0), requires_grad=False)
 
@@ -94,24 +96,24 @@ def main(args):
     fake_B_buffer = ReplayBuffer()
     
     # Dataset loader
-    transforms_ = [ transforms.Resize([args.size, args.size],interpolation=InterpolationMode.BICUBIC), # Image.BICUBIC
-                    # transforms.RandomCrop(args.size), 
-                    # transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    transforms.Normalize((0.5,), (0.5,)) ]
-    dataloader = DataLoader(ImageDataset(args.dataroot, transforms_=transforms_, mode='train'), 
+    transforms_ = [
+                    # transforms.Resize([256, 256]),
+                    # transforms.ToTensor(),
+                    # transforms.Normalize([0.5,], [0.5,])
+                    ]
+    dataloader = DataLoader(Rx0_ComplexNumpyDataset(args.dataroot, transforms_=transforms_, mode='train'), 
                             batch_size=args.batchSize, shuffle=False, num_workers=args.n_cpu, drop_last=True)
 
     # Loss plot
     logger = Logger(args.n_epochs, len(dataloader))
     ###################################
-
+    
     ###### Training ######
     for epoch in range(args.epoch, args.n_epochs):
         for i, batch in enumerate(dataloader):
             # Set model input
-            real_A = Variable(input_A.copy_(batch['mmwave']))
-            real_B = Variable(input_B.copy_(batch['audio']))
+            real_A = batch['mmVocal'].to(args.gpu)
+            real_B = batch['audio'].to(args.gpu)
 
             ###### Generators A2B and B2A ######
             optimizer_G.zero_grad()
@@ -186,52 +188,48 @@ def main(args):
 
             optimizer_D_B.step()
             ###################################
+            # pdb.set_trace()
 
             # Progress report (http://localhost:8097)
-            logger.log({'loss_G_M2': loss_G, 
-                        'loss_G_identity_M2': (loss_identity_A + loss_identity_B), 
-                        'loss_G_GAN_M2': (loss_GAN_A2B + loss_GAN_B2A),
-                        'loss_G_cycle_M2': (loss_cycle_ABA + loss_cycle_BAB), 
-                        'loss_G_similarity_M2': (loss_A2B_similarity + loss_B2A_similarity),
-                        'loss_D_M2': (loss_D_A + loss_D_B)}, 
-                        images={'real_A_M2': real_A, 'real_B_M2': real_B, 'fake_A_M2': fake_A, 'fake_B_M2': fake_B})
-            
-        # if epoch % 100 == 0:
-        #     # Save models checkpoints
-        #     torch.save(netG_A2B.state_dict(), 'weights/netG_A2B_epoch{}.pth'.format(epoch))
-        #     torch.save(netG_B2A.state_dict(), 'weights/epoch/netG_B2A_epoch{}.pth'.format(epoch))
-        #     torch.save(netD_A.state_dict(), 'weights/epoch/netD_A_epoch{}.pth'.format(epoch))
-        #     torch.save(netD_B.state_dict(), 'weights/netD_B_epoch{}.pth'.format(epoch))
-
+            logger.log({'npyRx0 loss_G': loss_G, 
+                        'npyRx0 loss_G_identity': (loss_identity_A + loss_identity_B), 
+                        'npyRx0 loss_G_GAN': (loss_GAN_A2B + loss_GAN_B2A),
+                        'npyRx0 loss_G_cycle': (loss_cycle_ABA + loss_cycle_BAB), 
+                        'npyRx0 loss_G_similarity': (loss_A2B_similarity + loss_B2A_similarity),
+                        'npyRx0 loss_D': (loss_D_A + loss_D_B)}, 
+                        images={'npyRx0 real_B_I': real_B[:, 0, :, :], 'npyRx0 real_B_Q': real_B[:, 1, :, :], 
+                                'npyRx0 fake_B_I': fake_B[:, 0, :, :], 'npyRx0 fake_B_Q': fake_B[:, 1, :, :]}
+                        )
+                        
         # Update learning rates
         lr_scheduler_G.step()
         lr_scheduler_D_A.step()
         lr_scheduler_D_B.step()
 
         # Save models checkpoints
-        torch.save(netG_A2B.state_dict(), 'weights/netG_A2B_M2_last.pth')
-        torch.save(netG_B2A.state_dict(), 'weights/netG_B2A_M2_last.pth')
-        torch.save(netD_A.state_dict(), 'weights/netD_A_M2_last.pth')
-        torch.save(netD_B.state_dict(), 'weights/netD_B_M2_last.pth')
+        torch.save(netG_A2B.state_dict(), 'weights_npyRx0/netG_A2B_last.pth')
+        # torch.save(netG_B2A.state_dict(), 'weights/netG_B2A_last.pth')
+        # torch.save(netD_A.state_dict(), 'weights/netD_A_last.pth')
+        torch.save(netD_B.state_dict(), 'weights_npyRx0/netD_B_last.pth')
     ###################################
 
 if __name__== "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--epoch',       type=int,  default=0,      help='starting epoch')
-    parser.add_argument('--n_epochs',    type=int,  default=1000,    help='number of epochs of training')
-    parser.add_argument('--batchSize',   type=int,  default=32,     help='size of the batches')
-    parser.add_argument('--dataroot',    type=str,  default='/root/workspace/dataset/mmGAN_Dataset_Digital/', help='root directory of the dataset')
+    parser.add_argument('--n_epochs',    type=int,  default=500,    help='number of epochs of training')
+    parser.add_argument('--batchSize',   type=int,  default=1,     help='size of the batches')
+    parser.add_argument('--dataroot',    type=str,  default='/root/workspace/dataset/mmGAN_Dataset_0627/', help='root directory of the dataset')
     parser.add_argument("--netD_A",      type=str,  default="",     help="Path to Discriminator checkpoint.")
     parser.add_argument("--netD_B",      type=str,  default="",     help="Path to Discriminator checkpoint.")
     parser.add_argument("--netG_A2B",    type=str,  default="",     help="Path to Generator checkpoint.")
     parser.add_argument("--netG_B2A",    type=str,  default="",     help="Path to Generator checkpoint.")
     parser.add_argument('--lr',          type=float, default=0.0002, help='initial learning rate')
-    parser.add_argument('--decay_epoch', type=int,  default=500,    help='epoch to start linearly decaying the learning rate to 0')
-    parser.add_argument('--size',        type=int,  default=128,    help='size of the data crop (squared assumed)')
-    parser.add_argument('--input_nc',    type=int,  default=1,      help='number of channels of input data')
-    parser.add_argument('--output_nc',   type=int,  default=1,      help='number of channels of output data')
+    parser.add_argument('--decay_epoch', type=int,  default=300,    help='epoch to start linearly decaying the learning rate to 0')
+    parser.add_argument('--size',        type=int,  default=256,    help='size of the data crop (squared assumed)')
+    parser.add_argument('--input_nc',    type=int,  default=2,      help='number of channels of input data')
+    parser.add_argument('--output_nc',   type=int,  default=2,      help='number of channels of output data')
     parser.add_argument("--gpu",         type=int,  default=0,      help="GPU id to use.")
-    parser.add_argument('--n_cpu',       type=int,  default=16,      help='number of cpu threads to use during batch generation')
+    parser.add_argument('--n_cpu',       type=int,  default=8,      help='number of cpu threads to use during batch generation')
     args = parser.parse_args()
     print(args)
 

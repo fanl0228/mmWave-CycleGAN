@@ -24,9 +24,9 @@ def main(image_file,
          gt_image_file,
          out_path,
          generator_A2B,
-         input_nc=1,
-         output_nc=1,
-         size=128,
+         input_nc=8,
+         output_nc=2,
+         size=256,
          gpu=None):
 
     if torch.cuda.is_available() and gpu is not None:
@@ -52,9 +52,7 @@ def main(image_file,
     if not os.path.exists("predict_out"):
         os.makedirs("predict_out")
     
-    transforms_ = [ transforms.Resize(int(size), Image.BICUBIC),
-                    transforms.ToTensor(),
-                    transforms.Normalize((0.5,), (0.5,)) ]
+    transforms_ = []
     imageA = get_batch_spectrum(image_path=image_file, transforms_=transforms_)
     imageA = torch.unsqueeze(imageA, dim=0)
 
@@ -65,7 +63,7 @@ def main(image_file,
     imageA = imageA.to(device)
 
     # Generate output
-    imageB = 0.5 * (netG_A2B(imageA).data + 1.0)
+    imageB = 0.5 * (netG_A2B(imageA).data + 1.0)*255
     # imageA_Re = 0.5 * (netG_B2A(imageB).data + 1.0)
 
     img_name = os.path.basename(image_file)
@@ -101,7 +99,7 @@ if __name__ == "__main__":
              gt_image_file=os.path.join(gt_image_dir, file),
              out_path="./output/",
              generator_A2B='weights/netG_A2B_last.pth',
-             input_nc=1,
-             output_nc=1,
-             size=128,
+             input_nc=8,
+             output_nc=2,
+             size=256,
              gpu=None)

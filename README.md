@@ -1,3 +1,15 @@
+<!--
+ * @Author: fanlong
+ * @Date: 2022-03-08 14:11:52
+ * @LastEditors: fanlong
+ * @LastEditTime: 2022-06-23 10:53:43
+ * @FilePath: /workspace/code/mmGAN/README.md
+ * @Description: 
+ * 
+ * @github: https://github.com/fanl0228
+ * @Email: fanl@smail.nju.edu.cn
+ * Copyright (c) 2022 by fanlong/Nanjing University, All Rights Reserved. 
+-->
 # mmCycle-CGAN
 
 
@@ -14,7 +26,7 @@ pip3 install visdom
 ```
 
 ```python
-python -m visdom.server
+python -m visdom.server -p 2022
 ```
 
 You can also view the training progress as well as live output images by running ```python3 -m visdom``` in another terminal and opening [http://localhost:8097/](http://localhost:8097/) in your favourite web browser.
@@ -23,6 +35,9 @@ You can also view the training progress as well as live output images by running
 If it is a remote server, a local ssh login is required to establish a connection
 ```
 ssh -L 18097:127.0.0.1:8097 user@ip
+
+ssh -L 2022:127.0.0.1:2022 root@8.136.3.19
+
 ```
 > Open the link [http://localhost:18097/](http://localhost:18097/) in your local browser
 

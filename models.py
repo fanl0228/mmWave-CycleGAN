@@ -1,3 +1,16 @@
+'''
+Author: fanlong
+Date: 2022-06-23 09:55:56
+LastEditors: fanlong
+LastEditTime: 2022-06-26 12:37:16
+FilePath: /workspace/code/mmGAN/models.py
+Description: 
+
+github: https://github.com/fanl0228
+Email: fanl@smail.nju.edu.cn
+Copyright (c) 2022 by fanlong/Nanjing University, All Rights Reserved. 
+'''
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
@@ -92,8 +105,13 @@ class Discriminator(nn.Module):
         return F.avg_pool2d(x, x.size()[2:]).view(x.size()[0], -1)
 
 if __name__ == "__main__":
-    # model = Generator(1, 1)
-    # print(model)
 
-    model = Discriminator(1)
-    print(model)
+    generator = Generator(8, 2)
+    inputg = torch.rand(1,8,256,128)
+    g_out = generator(inputg)
+    print("g_out shape: {}".format(g_out.shape))
+
+    discriminter = Discriminator(2)
+    input = torch.rand(1,2,256,128)
+    d_out = discriminter(input)
+    print("d_out shape: {}".format(d_out.shape))

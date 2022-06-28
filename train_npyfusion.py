@@ -17,7 +17,7 @@ from utils import ReplayBuffer
 from utils import LambdaLR
 from utils import Logger
 from utils import weights_init_normal
-from datasets import ImageDataset
+from datasets import ComplexNumpyDataset
 
 import pdb
 
@@ -74,8 +74,6 @@ def main(args):
 
     # Inputs & targets memory allocation
     Tensor = torch.cuda.FloatTensor if args.gpu is not None else torch.Tensor
-    input_A = Tensor(args.batchSize, args.input_nc, args.size, args.size)
-    input_B = Tensor(args.batchSize, args.output_nc, args.size, args.size)
     target_real = Variable(Tensor(args.batchSize, 1).fill_(1.0), requires_grad=False)
     target_fake = Variable(Tensor(args.batchSize, 1).fill_(0.0), requires_grad=False)
 
@@ -83,12 +81,8 @@ def main(args):
     fake_B_buffer = ReplayBuffer()
     
     # Dataset loader
-    transforms_ = [ transforms.Resize([args.size, args.size],interpolation=InterpolationMode.BICUBIC), # Image.BICUBIC
-                    # transforms.RandomCrop(args.size), 
-                    # transforms.RandomHorizontalFlip(),
-                    transforms.ToTensor(),
-                    transforms.Normalize((0.5,), (0.5,)) ]
-    dataloader = DataLoader(ImageDataset(args.dataroot, transforms_=transforms_, mode='train'), 
+    transforms_ = [ ]
+    dataloader = DataLoader(ComplexNumpyDataset(args.dataroot, transforms_=transforms_, mode='train'), 
                             batch_size=args.batchSize, shuffle=False, num_workers=args.n_cpu, drop_last=True)
 
     # Loss plot
@@ -99,19 +93,19 @@ def main(args):
     for epoch in range(args.epoch, args.n_epochs):
         for i, batch in enumerate(dataloader):
             # Set model input
-            real_A = Variable(input_A.copy_(batch['mmwave']))
-            real_B = Variable(input_B.copy_(batch['audio']))
+            real_A = batch['mmVocal'].to(args.gpu)
+            real_B = batch['audio'].to(args.gpu)
 
             ###### Generators A2B and B2A ######
             optimizer_G.zero_grad()
 
-            # Identity loss
-            # G_A2B(B) should equal B if real B is fed
-            same_B = netG_A2B(real_B)
-            loss_identity_B = criterion_identity(same_B, real_B)*5.0
-            # G_B2A(A) should equal A if real A is fed
-            same_A = netG_B2A(real_A)
-            loss_identity_A = criterion_identity(same_A, real_A)*5.0
+            # # Identity loss
+            # # G_A2B(B) should equal B if real B is fed
+            # same_B = netG_A2B(real_B)
+            # loss_identity_B = criterion_identity(same_B, real_B)*5.0
+            # # G_B2A(A) should equal A if real A is fed
+            # same_A = netG_B2A(real_A)
+            # loss_identity_A = criterion_identity(same_A, real_A)*5.0
 
             # GAN loss
             fake_B = netG_A2B(real_A)
@@ -132,7 +126,8 @@ def main(args):
             loss_cycle_BAB = criterion_cycle(recovered_B, real_B)*10.0
 
             # Total loss
-            loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB + loss_A2B_similarity + loss_B2A_similarity
+            # loss_G = loss_identity_A + loss_identity_B + loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB + loss_A2B_similarity + loss_B2A_similarity
+            loss_G = loss_GAN_A2B + loss_GAN_B2A + loss_cycle_ABA + loss_cycle_BAB + loss_A2B_similarity + loss_B2A_similarity
             loss_G.backward()
             
             optimizer_G.step()
@@ -177,20 +172,15 @@ def main(args):
             ###################################
 
             # Progress report (http://localhost:8097)
-            logger.log({'loss_G': loss_G, 
-                        'loss_G_identity': (loss_identity_A + loss_identity_B), 
-                        'loss_G_GAN': (loss_GAN_A2B + loss_GAN_B2A),
-                        'loss_G_cycle': (loss_cycle_ABA + loss_cycle_BAB), 
-                        'loss_G_similarity': (loss_A2B_similarity + loss_B2A_similarity),
-                        'loss_D': (loss_D_A + loss_D_B)}, 
-                        images={'real_A': real_A, 'real_B': real_B, 'fake_A': fake_A, 'fake_B': fake_B})
-            
-        # if epoch % 100 == 0:
-        #     # Save models checkpoints
-        #     torch.save(netG_A2B.state_dict(), 'weights/netG_A2B_epoch{}.pth'.format(epoch))
-        #     torch.save(netG_B2A.state_dict(), 'weights/epoch/netG_B2A_epoch{}.pth'.format(epoch))
-        #     torch.save(netD_A.state_dict(), 'weights/epoch/netD_A_epoch{}.pth'.format(epoch))
-        #     torch.save(netD_B.state_dict(), 'weights/netD_B_epoch{}.pth'.format(epoch))
+            logger.log({'npyfusion loss_G': loss_G, 
+                        # 'loss_G_identity': (loss_identity_A + loss_identity_B), 
+                        'npyfusion loss_G_GAN': (loss_GAN_A2B + loss_GAN_B2A),
+                        'npyfusion loss_G_cycle': (loss_cycle_ABA + loss_cycle_BAB), 
+                        'npyfusion loss_G_similarity': (loss_A2B_similarity + loss_B2A_similarity),
+                        'npyfusion loss_D': (loss_D_A + loss_D_B)}, 
+                        images={'npyfusion real_B_I': real_B[:, 0, :, :], 'npyfusion real_B_Q': real_B[:, 1, :, :], 
+                                'npyfusion fake_B_I': fake_B[:, 0, :, :], 'npyfusion fake_B_Q': fake_B[:, 1, :, :]}
+                        )
 
         # Update learning rates
         lr_scheduler_G.step()
@@ -198,29 +188,29 @@ def main(args):
         lr_scheduler_D_B.step()
 
         # Save models checkpoints
-        torch.save(netG_A2B.state_dict(), 'weights/netG_A2B_last.pth')
-        torch.save(netG_B2A.state_dict(), 'weights/netG_B2A_last.pth')
-        torch.save(netD_A.state_dict(), 'weights/netD_A_last.pth')
-        torch.save(netD_B.state_dict(), 'weights/netD_B_last.pth')
+        torch.save(netG_A2B.state_dict(), 'weights_npyfusion/netG_A2B_last.pth')
+        torch.save(netG_B2A.state_dict(), 'weights_npyfusion/netG_B2A_last.pth')
+        torch.save(netD_A.state_dict(), 'weights_npyfusion/netD_A_last.pth')
+        torch.save(netD_B.state_dict(), 'weights_npyfusion/netD_B_last.pth')
     ###################################
 
 if __name__== "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument('--epoch',       type=int,  default=0,      help='starting epoch')
-    parser.add_argument('--n_epochs',    type=int,  default=1000,    help='number of epochs of training')
-    parser.add_argument('--batchSize',   type=int,  default=1,     help='size of the batches')
-    parser.add_argument('--dataroot',    type=str,  default='/root/workspace/dataset/mmGAN_Dataset_Digital/', help='root directory of the dataset')
-    parser.add_argument("--netD_A",      type=str,  default="",     help="Path to Discriminator checkpoint.")
-    parser.add_argument("--netD_B",      type=str,  default="",     help="Path to Discriminator checkpoint.")
-    parser.add_argument("--netG_A2B",    type=str,  default="",     help="Path to Generator checkpoint.")
-    parser.add_argument("--netG_B2A",    type=str,  default="",     help="Path to Generator checkpoint.")
+    parser.add_argument('--epoch',       type=int,   default=0,      help='starting epoch')
+    parser.add_argument('--n_epochs',    type=int,   default=500,    help='number of epochs of training')
+    parser.add_argument('--batchSize',   type=int,   default=1,     help='size of the batches')
+    parser.add_argument('--dataroot',    type=str,   default='/root/workspace/dataset/mmGAN_Dataset_0627/', help='root directory of the dataset')
+    parser.add_argument("--netD_A",      type=str,   default="",     help="Path to Discriminator checkpoint.")
+    parser.add_argument("--netD_B",      type=str,   default="",     help="Path to Discriminator checkpoint.")
+    parser.add_argument("--netG_A2B",    type=str,   default="",     help="Path to Generator checkpoint.")
+    parser.add_argument("--netG_B2A",    type=str,   default="",     help="Path to Generator checkpoint.")
     parser.add_argument('--lr',          type=float, default=0.0002, help='initial learning rate')
-    parser.add_argument('--decay_epoch', type=int,  default=300,    help='epoch to start linearly decaying the learning rate to 0')
-    parser.add_argument('--size',        type=int,  default=128,    help='size of the data crop (squared assumed)')
-    parser.add_argument('--input_nc',    type=int,  default=1,      help='number of channels of input data')
-    parser.add_argument('--output_nc',   type=int,  default=1,      help='number of channels of output data')
-    parser.add_argument("--gpu",         type=int,  default=0,      help="GPU id to use.")
-    parser.add_argument('--n_cpu',       type=int,  default=16,      help='number of cpu threads to use during batch generation')
+    parser.add_argument('--decay_epoch', type=int,   default=300,    help='epoch to start linearly decaying the learning rate to 0')
+    parser.add_argument('--size',        type=int,   default=256,    help='size of the data crop (squared assumed)')
+    parser.add_argument('--input_nc',    type=int,   default=8,      help='number of channels of input data')
+    parser.add_argument('--output_nc',   type=int,   default=2,      help='number of channels of output data')
+    parser.add_argument("--gpu",         type=int,   default=0,      help="GPU id to use.")
+    parser.add_argument('--n_cpu',       type=int,   default=8,      help='number of cpu threads to use during batch generation')
     args = parser.parse_args()
     print(args)
 
