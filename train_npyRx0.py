@@ -2,7 +2,7 @@
 Author: fanlong
 Date: 2022-06-28 14:25:32
 LastEditors: fanlong
-LastEditTime: 2022-06-28 16:40:31
+LastEditTime: 2022-06-28 20:33:18
 FilePath: /workspace/code/mmGAN/train_npyRx0.py
 Description: 
 
@@ -232,5 +232,12 @@ if __name__== "__main__":
     parser.add_argument('--n_cpu',       type=int,  default=8,      help='number of cpu threads to use during batch generation')
     args = parser.parse_args()
     print(args)
+    try:
+        import os
+        weights_path = "./weights_npyRx0"
+        os.makedirs(weights_path)
+        print("Create directory successful.")
+    except OSError:
+        print("Directory  already exists!")
 
     main(args)

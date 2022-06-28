@@ -2,7 +2,7 @@
 Author: fanlong
 Date: 2022-06-28 14:25:32
 LastEditors: fanlong
-LastEditTime: 2022-06-28 14:55:49
+LastEditTime: 2022-06-28 20:32:55
 FilePath: /workspace/code/mmGAN/train_img.py
 Description: 
 
@@ -229,5 +229,13 @@ if __name__== "__main__":
     parser.add_argument('--n_cpu',       type=int,  default=8,      help='number of cpu threads to use during batch generation')
     args = parser.parse_args()
     print(args)
+
+    try:
+        import os
+        weights_path = "./weights_train_img"
+        os.makedirs(weights_path)
+        print("Create directory successful.")
+    except OSError:
+        print("Directory  already exists!")
 
     main(args)

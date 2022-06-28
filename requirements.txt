@@ -1,6 +1,5 @@
-torch
-torchvision
-
+python3 -m pip install --upgrade torch torchvision -i https://pypi.tuna.tsinghua.edu.cn/simple
+pip install visdom
 
 
 

@@ -213,5 +213,13 @@ if __name__== "__main__":
     parser.add_argument('--n_cpu',       type=int,   default=8,      help='number of cpu threads to use during batch generation')
     args = parser.parse_args()
     print(args)
-
+    
+    try:
+        import os
+        weights_path = "./weights_npyfusion"
+        os.makedirs(weights_path)
+        print("Create directory successful.")
+    except OSError:
+        print("Directory  already exists!")
+   
     main(args)
